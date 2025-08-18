@@ -13,6 +13,8 @@ ccproxy:
         - model_name: claude-3-5-haiku-20241022
     - name: think
       rule: ccproxy.rules.ThinkingRule
+    # - name: default
+    #   rule: ccproxy.rules.DefaultRule
 
 litellm:
   host: 127.0.0.1

@@ -39,6 +39,10 @@ class DefaultRule(ClassificationRule):
     def __init__(self, passthrough: bool):
         self.passthrough = passthrough
 
+    def evaluate(self, request: dict[str, Any], config: "CCProxyConfig") -> bool:
+        """Default rule that always returns true: place at the bottom of the rule list."""
+        return True
+
 
 class ThinkingRule(ClassificationRule):
     """Rule for classifying requests with thinking field."""
