@@ -9,7 +9,7 @@ import pytest
 from ccproxy.classifier import RequestClassifier
 from ccproxy.config import clear_config_instance
 from ccproxy.hooks import forward_oauth, model_router, rule_evaluator
-from ccproxy.router import ModelRouter, clear_router
+from ccproxy.router import ModelRouter
 
 
 @pytest.fixture
@@ -56,7 +56,6 @@ def cleanup():
     """Clean up config and router between tests."""
     yield
     clear_config_instance()
-    clear_router()
 
 
 class TestRuleEvaluator:

@@ -232,30 +232,3 @@ class ModelRouter:
             self._models_loaded = False
             self._ensure_models_loaded()
 
-
-# Global router instance
-_router_instance: ModelRouter | None = None
-
-
-def get_router() -> ModelRouter:
-    """Get the global ModelRouter instance.
-
-    Returns:
-        The global ModelRouter instance
-    """
-    global _router_instance
-
-    if _router_instance is None:
-        _router_instance = ModelRouter()
-
-    return _router_instance
-
-
-def clear_router() -> None:
-    """Clear the global router instance.
-
-    This function is used in testing to ensure clean state
-    between test runs.
-    """
-    global _router_instance
-    _router_instance = None

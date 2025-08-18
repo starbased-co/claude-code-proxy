@@ -9,7 +9,7 @@ import yaml
 
 from ccproxy.config import CCProxyConfig, RuleConfig, clear_config_instance, set_config_instance
 from ccproxy.handler import CCProxyHandler
-from ccproxy.router import ModelRouter, clear_router
+from ccproxy.router import ModelRouter
 
 
 class TestCCProxyRouting:
@@ -171,7 +171,6 @@ class TestCCProxyRouting:
                 assert result["model"] == "claude-sonnet-4-20250514"
         finally:
             clear_config_instance()
-            clear_router()
 
     async def test_route_to_background(self, config_files):
         """Test routing haiku model to background."""
@@ -224,7 +223,6 @@ class TestCCProxyRouting:
                 assert result["model"] == "claude-3-5-haiku-20241022"
         finally:
             clear_config_instance()
-            clear_router()
 
 
 class TestHandlerHookMethods:
@@ -313,12 +311,10 @@ class TestHandlerHookMethods:
 
         try:
             with patch.dict("sys.modules", {"litellm.proxy": mock_module}):
-                clear_router()  # Clear any existing router
                 handler = CCProxyHandler()
                 yield handler
         finally:
             clear_config_instance()
-            clear_router()
 
     @pytest.mark.asyncio
     async def test_log_success_hook(self, handler: CCProxyHandler) -> None:
@@ -462,7 +458,6 @@ class TestCCProxyHandler:
             else:
                 sys.modules["litellm.proxy"] = original_module
             clear_config_instance()
-            clear_router()
 
     @pytest.fixture
     def config_files(self):
@@ -648,7 +643,6 @@ class TestCCProxyHandler:
             ccproxy_path.unlink()
             litellm_path.unlink()
             clear_config_instance()
-            clear_router()
 
     @pytest.mark.asyncio
     async def test_hooks_loaded_from_config(self) -> None:
@@ -700,7 +694,6 @@ class TestCCProxyHandler:
             ccproxy_path.unlink()
             litellm_path.unlink()
             clear_config_instance()
-            clear_router()
 
     @pytest.mark.asyncio
     async def test_no_default_model_fallback(self) -> None:
@@ -733,7 +726,6 @@ class TestCCProxyHandler:
 
         try:
             with patch.dict("sys.modules", {"litellm.proxy": mock_module}):
-                clear_router()  # Clear router to force reload
                 handler = CCProxyHandler()
 
                 # Test with request that doesn't match any rule
@@ -761,7 +753,6 @@ class TestCCProxyHandler:
 
         finally:
             clear_config_instance()
-            clear_router()
 
     @pytest.mark.asyncio
     async def test_log_routing_decision_fallback_scenario(self) -> None:
@@ -785,7 +776,6 @@ class TestCCProxyHandler:
 
         finally:
             clear_config_instance()
-            clear_router()
 
     @pytest.mark.asyncio
     async def test_log_routing_decision_passthrough_scenario(self) -> None:
@@ -810,4 +800,3 @@ class TestCCProxyHandler:
 
         finally:
             clear_config_instance()
-            clear_router()

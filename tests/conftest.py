@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from ccproxy.config import clear_config_instance
-from ccproxy.router import clear_router
 
 
 @pytest.fixture(autouse=True)
@@ -14,7 +13,6 @@ def cleanup():
     yield
     # Clean up singleton instances
     clear_config_instance()
-    clear_router()
 
 
 @pytest.fixture

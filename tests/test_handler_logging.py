@@ -48,7 +48,7 @@ class TestHandlerLoggingHookMethods:
         """Test async_pre_call_hook with invalid request format."""
         # Mock the router to provide a default model
         with (
-            patch("ccproxy.handler.get_router") as mock_get_router,
+            patch("ccproxy.handler.ModelRouter") as mock_router_class,
             patch("ccproxy.handler.get_config") as mock_get_config,
         ):
             from ccproxy.router import ModelRouter
@@ -58,7 +58,7 @@ class TestHandlerLoggingHookMethods:
                 "model_name": "default",
                 "litellm_params": {"model": "claude-sonnet-4-20250514"},
             }
-            mock_get_router.return_value = mock_router
+            mock_router_class.return_value = mock_router
 
             # Mock config to include hooks
             mock_config = Mock()
@@ -94,7 +94,7 @@ class TestHandlerLoggingHookMethods:
     async def test_handler_with_debug_hook_logging(self) -> None:
         """Test handler debug logging of hooks during initialization."""
         with (
-            patch("ccproxy.handler.get_router") as mock_get_router,
+            patch("ccproxy.handler.ModelRouter") as mock_router_class,
             patch("ccproxy.handler.get_config") as mock_get_config,
             patch("ccproxy.handler.logger") as mock_logger,
         ):
@@ -111,7 +111,7 @@ class TestHandlerLoggingHookMethods:
             mock_get_config.return_value = mock_config
 
             mock_router = Mock()
-            mock_get_router.return_value = mock_router
+            mock_router_class.return_value = mock_router
 
             # Create handler - should log hooks
             handler = CCProxyHandler()
@@ -123,13 +123,13 @@ class TestHandlerLoggingHookMethods:
     async def test_hook_error_handling(self) -> None:
         """Test handler error handling when hooks fail."""
         with (
-            patch("ccproxy.handler.get_router") as mock_get_router,
+            patch("ccproxy.handler.ModelRouter") as mock_router_class,
             patch("ccproxy.handler.get_config") as mock_get_config,
             patch("ccproxy.handler.logger") as mock_logger,
         ):
             # Mock router
             mock_router = Mock()
-            mock_get_router.return_value = mock_router
+            mock_router_class.return_value = mock_router
 
             # Mock config with a failing hook
             mock_config = Mock()

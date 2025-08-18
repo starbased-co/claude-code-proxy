@@ -5,18 +5,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ccproxy.router import ModelRouter, clear_router, get_router
+from ccproxy.router import ModelRouter
 
 
 class TestModelRouter:
     """Test suite for ModelRouter."""
 
-    @pytest.fixture(autouse=True)
-    def setup_cleanup(self):
-        """Clear router singleton before each test."""
-        clear_router()
-        yield
-        clear_router()
 
     def _create_router_with_models(self, model_list: list) -> ModelRouter:
         """Helper to create a router with mocked models."""
@@ -282,16 +276,6 @@ class TestModelRouter:
         # All threads should get consistent results
         assert all(r == results[0] for r in results)
 
-    def test_global_router_singleton(self) -> None:
-        """Test that get_router returns singleton instance."""
-        router1 = get_router()
-        router2 = get_router()
-        assert router1 is router2
-
-        # Clear and get new instance
-        clear_router()
-        router3 = get_router()
-        assert router3 is not router1
 
     def test_fallback_to_default_model(self) -> None:
         """Test fallback to 'default' model when label not found."""

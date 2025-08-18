@@ -6,7 +6,6 @@ import pytest
 
 from ccproxy.config import clear_config_instance
 from ccproxy.handler import CCProxyHandler
-from ccproxy.router import clear_router
 
 
 @pytest.fixture
@@ -52,13 +51,11 @@ def mock_handler():
 
     # Patch the proxy server import
     with patch.dict("sys.modules", {"litellm.proxy": mock_module}):
-        clear_router()  # Clear any existing router
         handler = CCProxyHandler()  # Create actual handler instance
         yield handler
 
     # Cleanup
     clear_config_instance()
-    clear_router()
 
 
 @pytest.mark.asyncio
@@ -154,7 +151,6 @@ async def test_no_oauth_forwarding_for_non_anthropic_models(mock_handler):
     set_config_instance(config)
 
     with patch.dict("sys.modules", {"litellm.proxy": mock_module}):
-        clear_router()
         handler = CCProxyHandler()
 
         # Test data with high token count to trigger routing to gemini
@@ -181,7 +177,6 @@ async def test_no_oauth_forwarding_for_non_anthropic_models(mock_handler):
         assert result["model"] == "gemini-2.5-pro"
 
     clear_config_instance()
-    clear_router()
 
 
 @pytest.mark.asyncio
@@ -327,7 +322,6 @@ async def test_no_oauth_forwarding_when_routed_to_non_anthropic(mock_handler):
     set_config_instance(config)
 
     with patch.dict("sys.modules", {"litellm.proxy": mock_module}):
-        clear_router()
         handler = CCProxyHandler()
 
         # Test data from claude-cli that will be routed to a non-Anthropic model
@@ -389,7 +383,6 @@ async def test_no_oauth_forwarding_for_anthropic_model_on_vertex():
     set_config_instance(config)
 
     with patch.dict("sys.modules", {"litellm.proxy": mock_module}):
-        clear_router()
         handler = CCProxyHandler()
 
         # Test data from claude-cli
@@ -415,7 +408,6 @@ async def test_no_oauth_forwarding_for_anthropic_model_on_vertex():
         assert result["model"] == "vertex/claude-3-5-sonnet"
 
     clear_config_instance()
-    clear_router()
 
 
 @pytest.mark.asyncio
@@ -453,7 +445,6 @@ async def test_oauth_forwarding_for_anthropic_direct_api():
     set_config_instance(config)
 
     with patch.dict("sys.modules", {"litellm.proxy": mock_module}):
-        clear_router()
         handler = CCProxyHandler()
 
         # Test data from claude-cli
@@ -481,4 +472,3 @@ async def test_oauth_forwarding_for_anthropic_direct_api():
         assert result["model"] == "anthropic/claude-sonnet-4-20250514"
 
     clear_config_instance()
-    clear_router()

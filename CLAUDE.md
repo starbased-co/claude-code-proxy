@@ -119,7 +119,7 @@ The test suite uses pytest with comprehensive fixtures:
 
 ## Important Implementation Notes
 
-The project uses singleton patterns for `CCProxyConfig` and `ModelRouter` - use `clear_config_instance()` and `clear_router()` to reset state in tests
+The project uses a singleton pattern for `CCProxyConfig` - use `clear_config_instance()` to reset state in tests
 
 - Token counting uses tiktoken with fallback to character-based estimation
 - OAuth token forwarding is handled specially for Claude CLI requests to Anthropic API

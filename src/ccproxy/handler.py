@@ -8,7 +8,7 @@ from rich import print, inspect
 
 from ccproxy.classifier import RequestClassifier
 from ccproxy.config import get_config
-from ccproxy.router import get_router
+from ccproxy.router import ModelRouter
 from ccproxy.utils import calculate_duration_ms
 
 # Set up structured logging
@@ -30,7 +30,7 @@ class CCProxyHandler(CustomLogger):
     def __init__(self) -> None:
         super().__init__()
         self.classifier = RequestClassifier()
-        self.router = get_router()
+        self.router = ModelRouter()
 
         config = get_config()
         if config.debug:
