@@ -190,18 +190,22 @@ See [docs/configuration.md](docs/configuration.md) for more information on how t
 
 <!-- Normally, when you send a message, Claude Code does a simple keyword scan for words/phrases like "think deeply" to determine whether or not to enable thinking, as well the size of the thinking token budget. [Simply including the word "ultrathink](https://claudelog.com/mechanics/ultrathink-plus-plus/) sets the thinking token budget to the maximum of `31999`. -->
 
-## Routing Rules
+## Hooks & Rules
+
+## Hooks
+
+### Rules
 
 `ccproxy` provides several built-in rules as an homage to [claude-code-router](https://github.com/musistudio/claude-code-router):
 
 - **MatchModelRule**: Routes based on the requested model name
 - **ThinkingRule**: Routes requests containing a "thinking" field
-- **TokenCountRule**: Routes requests with large token counts to high-capacity models
+- **TokenCountRule**: Routes requests with large token counts
 - **MatchToolRule**: Routes based on tool usage (e.g., WebSearch)
 
 See [`rules.py`](src/ccproxy/rules.py) for implementing your own rules.
 
-Custom rules (and hooks) are loaded with the same mechanism that LiteLLM uses to import the custom callbacks, that is, they are imported as by the LiteLLM python process as named module from within it's virtual environment (e.g. `import custom_rule_file.custom_rule_function`), or as a python script adjacent to `config.yaml`.
+Custom rules (and hooks) are loaded with the same mechanism that LiteLLM uses to import the custom callbacks, that is, they are imported by the LiteLLM python process as named module from within it's virtual environment (e.g. `import custom_rule_file.custom_rule_function`), or as a python script adjacent to `config.yaml`.
 
 ## CLI Commands
 

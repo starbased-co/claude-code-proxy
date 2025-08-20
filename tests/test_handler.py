@@ -687,8 +687,10 @@ class TestCCProxyHandler:
 
                 # Verify hooks were loaded
                 assert len(handler.hooks) == 2
-                assert any("rule_evaluator" in str(h) for h in handler.hooks)
-                assert any("model_router" in str(h) for h in handler.hooks)
+                # Check that the hook instances are loaded (they're now class instances)
+                hook_names = [h.__class__.__name__ for h in handler.hooks]
+                assert "RuleEvaluatorHook" in hook_names
+                assert "ModelRouterHook" in hook_names
 
         finally:
             ccproxy_path.unlink()
@@ -767,12 +769,16 @@ class TestCCProxyHandler:
 
             # Test fallback scenario where model_config is None
             # This tests lines 135-136: color = "yellow", routing_type = "FALLBACK"
-            handler._log_routing_decision(
-                model_name="default",
-                original_model="gpt-4",
-                routed_model="claude-3-5-sonnet",
-                model_config=None,  # This triggers the fallback path
-            )
+            data = {
+                "metadata": {
+                    "ccproxy_model_name": "default",
+                    "ccproxy_alias_model": "gpt-4",
+                    "ccproxy_litellm_model": "claude-3-5-sonnet",
+                    "ccproxy_model_config": None,  # This triggers the fallback path
+                    "ccproxy_is_passthrough": False,
+                }
+            }
+            handler._log_routing_decision(data)
 
         finally:
             clear_config_instance()
@@ -791,12 +797,16 @@ class TestCCProxyHandler:
             # Test passthrough scenario where original_model == routed_model
             # This tests lines 139-140: color = "dim", routing_type = "PASSTHROUGH"
             model_config = {"model_info": {"some": "config"}}
-            handler._log_routing_decision(
-                model_name="default",
-                original_model="claude-3-5-sonnet",
-                routed_model="claude-3-5-sonnet",  # Same as original = passthrough
-                model_config=model_config,
-            )
+            data = {
+                "metadata": {
+                    "ccproxy_model_name": "default",
+                    "ccproxy_alias_model": "claude-3-5-sonnet",
+                    "ccproxy_litellm_model": "claude-3-5-sonnet",  # Same as original = passthrough
+                    "ccproxy_model_config": model_config,
+                    "ccproxy_is_passthrough": True,
+                }
+            }
+            handler._log_routing_decision(data)
 
         finally:
             clear_config_instance()

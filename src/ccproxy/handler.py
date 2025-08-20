@@ -4,7 +4,7 @@ import logging
 from typing import Any, TypedDict
 
 from litellm.integrations.custom_logger import CustomLogger
-from rich import print, inspect
+from rich import print
 
 from ccproxy.classifier import RequestClassifier
 from ccproxy.config import get_config
@@ -39,7 +39,13 @@ class CCProxyHandler(CustomLogger):
         # Load hooks from configuration
         self.hooks = config.load_hooks()
         if config.debug and self.hooks:
-            hook_names = [f"{h.__module__}.{h.__name__}" for h in self.hooks]
+            hook_names = []
+            for h in self.hooks:
+                # Handle both function hooks and class-based hooks
+                if hasattr(h, "__name__"):
+                    hook_names.append(f"{h.__module__}.{h.__name__}")
+                else:
+                    hook_names.append(f"{h.__module__}.{h.__class__.__name__}")
             logger.debug(f"Loaded {len(self.hooks)} hooks: {', '.join(hook_names)}")
 
     async def async_pre_call_hook(
@@ -56,12 +62,14 @@ class CCProxyHandler(CustomLogger):
         # Run all processors in sequence with error handling
         for hook in self.hooks:
             try:
-                data = hook(data, user_api_key_dict, classifier=self.classifier, router=self.router)
+                data = hook(data, user_api_key_dict, self)
             except Exception as e:
+                # Get hook name for both function and class-based hooks
+                hook_name = hook.__name__ if hasattr(hook, "__name__") else hook.__class__.__name__
                 logger.error(
-                    f"Hook {hook.__name__} failed with error: {e}",
+                    f"Hook {hook_name} failed with error: {e}",
                     extra={
-                        "hook_name": hook.__name__,
+                        "hook_name": hook_name,
                         "error_type": type(e).__name__,
                         "error_message": str(e),
                     },
@@ -71,34 +79,35 @@ class CCProxyHandler(CustomLogger):
                 # The request will proceed with partial processing
 
         # Log routing decision with structured logging
-        metadata = data.get("metadata", {})
-        self._log_routing_decision(
-            model_name=metadata.get("ccproxy_model_name", None),
-            original_model=metadata.get("ccproxy_alias_model", None),
-            routed_model=metadata.get("ccproxy_litellm_model", None),
-            model_config=metadata.get("ccproxy_model_config"),
-            is_passthrough=metadata.get("ccproxy_is_passthrough", False),
-        )
+        self._log_routing_decision(data)
 
         return data
 
-    def _log_routing_decision(
+    async def async_log_post_api_call(
         self,
-        model_name: str,
-        original_model: str,
-        routed_model: str,
-        model_config: dict[str, Any] | None,
-        is_passthrough: bool = False,
+        kwargs: dict[str, Any],
+        response_obj: Any,
+        start_time: float,
+        end_time: float,
     ) -> None:
+        """Analyze response characteristics and routing effectiveness."""
+        metadata = kwargs.get("metadata", {})
+
+        logger.info("ccproxy post-API call analysis", extra=metadata)
+
+    def _log_routing_decision(self, data: dict[str, Any]) -> None:
         """Log routing decision with structured logging.
 
         Args:
-            model_name: Classification model_name
-            original_model: Original model requested
-            routed_model: Model after routing
-            model_config: Model configuration from router (None if fallback or passthrough)
-            is_passthrough: Whether this was a passthrough decision (no rule applied + passthrough enabled)
+            data: The complete request data dict containing metadata
         """
+        # Extract routing information from metadata
+        metadata = data.get("metadata", {})
+        model_name = metadata.get("ccproxy_model_name")
+        original_model = metadata.get("ccproxy_alias_model")
+        routed_model = metadata.get("ccproxy_litellm_model")
+        model_config = metadata.get("ccproxy_model_config")
+        is_passthrough = metadata.get("ccproxy_is_passthrough", False)
         # Get config to check debug mode
         config = get_config()
 

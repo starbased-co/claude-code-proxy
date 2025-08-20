@@ -58,16 +58,27 @@ def cleanup():
     clear_config_instance()
 
 
+@pytest.fixture
+def mock_handler(mock_classifier, mock_router):
+    """Create a mock handler with classifier and router."""
+    class MockHandler:
+        def __init__(self, classifier, router):
+            self.classifier = classifier
+            self.router = router
+    
+    return MockHandler(mock_classifier, mock_router)
+
+
 class TestRuleEvaluator:
     """Test the rule_evaluator hook function."""
 
-    def test_rule_evaluator_success(self, mock_classifier, basic_request_data, user_api_key_dict):
+    def test_rule_evaluator_success(self, mock_handler, basic_request_data, user_api_key_dict):
         """Test successful rule evaluation."""
-        # Call rule_evaluator with classifier
+        # Call rule_evaluator with handler
         result = rule_evaluator(
             basic_request_data,
             user_api_key_dict,
-            classifier=mock_classifier
+            mock_handler
         )
 
         # Verify metadata was added
@@ -76,9 +87,9 @@ class TestRuleEvaluator:
         assert result["metadata"]["ccproxy_model_name"] == "test_model_name"
 
         # Verify classifier was called
-        mock_classifier.classify.assert_called_once_with(basic_request_data)
+        mock_handler.classifier.classify.assert_called_once_with(basic_request_data)
 
-    def test_rule_evaluator_existing_metadata(self, mock_classifier, user_api_key_dict):
+    def test_rule_evaluator_existing_metadata(self, mock_handler, user_api_key_dict):
         """Test rule_evaluator preserves existing metadata."""
         data_with_metadata = {
             "model": "claude-3-5-haiku-20241022",
@@ -86,11 +97,7 @@ class TestRuleEvaluator:
             "metadata": {"existing_key": "existing_value"}
         }
 
-        result = rule_evaluator(
-            data_with_metadata,
-            user_api_key_dict,
-            classifier=mock_classifier
-        )
+        result = rule_evaluator(data_with_metadata, user_api_key_dict, mock_handler)
 
         # Verify existing metadata preserved and new metadata added
         assert result["metadata"]["existing_key"] == "existing_value"
@@ -100,36 +107,28 @@ class TestRuleEvaluator:
     def test_rule_evaluator_missing_classifier(self, basic_request_data, user_api_key_dict, caplog):
         """Test rule_evaluator handles missing classifier gracefully."""
         with caplog.at_level(logging.WARNING):
-            result = rule_evaluator(basic_request_data, user_api_key_dict)
+            result = rule_evaluator(basic_request_data, user_api_key_dict, None)
 
         # Should return original data unchanged
         assert result == basic_request_data
-        assert "Classifier not found or invalid type in rule_evaluator" in caplog.text
+        assert "Handler missing classifier or classifier has invalid type in rule_evaluator" in caplog.text
 
     def test_rule_evaluator_invalid_classifier(self, basic_request_data, user_api_key_dict, caplog):
         """Test rule_evaluator handles invalid classifier type."""
         with caplog.at_level(logging.WARNING):
-            result = rule_evaluator(
-                basic_request_data,
-                user_api_key_dict,
-                classifier="invalid_classifier"
-            )
+            result = rule_evaluator(basic_request_data, user_api_key_dict, "invalid_classifier")
 
         # Should return original data unchanged
         assert result == basic_request_data
-        assert "Classifier not found or invalid type in rule_evaluator" in caplog.text
+        assert "Handler missing classifier or classifier has invalid type in rule_evaluator" in caplog.text
 
-    def test_rule_evaluator_no_model_in_data(self, mock_classifier, user_api_key_dict):
+    def test_rule_evaluator_no_model_in_data(self, mock_handler, user_api_key_dict):
         """Test rule_evaluator handles data without model."""
         data_no_model = {
             "messages": [{"role": "user", "content": "test"}],
         }
 
-        result = rule_evaluator(
-            data_no_model,
-            user_api_key_dict,
-            classifier=mock_classifier
-        )
+        result = rule_evaluator(data_no_model, user_api_key_dict, mock_handler)
 
         # Should still add metadata
         assert "metadata" in result
@@ -140,7 +139,7 @@ class TestRuleEvaluator:
 class TestModelRouter:
     """Test the model_router hook function."""
 
-    def test_model_router_success(self, mock_router, user_api_key_dict):
+    def test_model_router_success(self, mock_handler, user_api_key_dict):
         """Test successful model routing."""
         data_with_metadata = {
             "model": "original_model",
@@ -148,7 +147,7 @@ class TestModelRouter:
             "metadata": {"ccproxy_model_name": "test_model"}
         }
 
-        result = model_router(data_with_metadata, user_api_key_dict, router=mock_router)
+        result = model_router(data_with_metadata, user_api_key_dict, mock_handler)
 
         # Verify model was routed
         assert result["model"] == "claude-sonnet-4-20250514"
@@ -156,7 +155,7 @@ class TestModelRouter:
         assert "ccproxy_model_config" in result["metadata"]
 
         # Verify router was called
-        mock_router.get_model_for_label.assert_called_once_with("test_model")
+        mock_handler.router.get_model_for_label.assert_called_once_with("test_model")
 
     def test_model_router_missing_router(self, user_api_key_dict, caplog):
         """Test model_router handles missing router gracefully."""
@@ -166,11 +165,11 @@ class TestModelRouter:
         }
 
         with caplog.at_level(logging.WARNING):
-            result = model_router(data, user_api_key_dict)
+            result = model_router(data, user_api_key_dict, None)
 
         # Should return original data unchanged
         assert result == data
-        assert "Router not found or invalid type in model_router" in caplog.text
+        assert "Handler missing router or router has invalid type in model_router" in caplog.text
 
     def test_model_router_invalid_router(self, user_api_key_dict, caplog):
         """Test model_router handles invalid router type."""
@@ -180,24 +179,24 @@ class TestModelRouter:
         }
 
         with caplog.at_level(logging.WARNING):
-            result = model_router(data, user_api_key_dict, router="invalid_router")
+            result = model_router(data, user_api_key_dict, "invalid_router")
 
         # Should return original data unchanged
         assert result == data
-        assert "Router not found or invalid type in model_router" in caplog.text
+        assert "Handler missing router or router has invalid type in model_router" in caplog.text
 
-    def test_model_router_no_metadata(self, mock_router, user_api_key_dict, caplog):
+    def test_model_router_no_metadata(self, mock_handler, user_api_key_dict, caplog):
         """Test model_router handles missing metadata gracefully."""
         data = {"model": "original_model"}
 
         with caplog.at_level(logging.WARNING):
-            result = model_router(data, user_api_key_dict, router=mock_router)
+            result = model_router(data, user_api_key_dict, mock_handler)
 
         # Should use default model name and create metadata
-        mock_router.get_model_for_label.assert_called_once_with("default")
+        mock_handler.router.get_model_for_label.assert_called_once_with("default")
         assert "metadata" in result
 
-    def test_model_router_empty_model_name(self, mock_router, user_api_key_dict, caplog):
+    def test_model_router_empty_model_name(self, mock_handler, user_api_key_dict, caplog):
         """Test model_router handles empty model name."""
         data = {
             "model": "original_model",
@@ -205,15 +204,15 @@ class TestModelRouter:
         }
 
         with caplog.at_level(logging.WARNING):
-            result = model_router(data, user_api_key_dict, router=mock_router)
+            result = model_router(data, user_api_key_dict, mock_handler)
 
         # Should use default and log warning
-        mock_router.get_model_for_label.assert_called_once_with("default")
+        mock_handler.router.get_model_for_label.assert_called_once_with("default")
         assert "No ccproxy_model_name found, using default" in caplog.text
 
-    def test_model_router_no_litellm_params(self, mock_router, user_api_key_dict, caplog):
+    def test_model_router_no_litellm_params(self, mock_handler, user_api_key_dict, caplog):
         """Test model_router handles config without litellm_params."""
-        mock_router.get_model_for_label.return_value = {"other_config": "value"}
+        mock_handler.router.get_model_for_label.return_value = {"other_config": "value"}
 
         data = {
             "model": "original_model",
@@ -221,15 +220,15 @@ class TestModelRouter:
         }
 
         with caplog.at_level(logging.WARNING):
-            result = model_router(data, user_api_key_dict, router=mock_router)
+            result = model_router(data, user_api_key_dict, mock_handler)
 
         # Should log warning about missing model
         assert "No model found in config for model_name: test_model" in caplog.text
         assert result["metadata"]["ccproxy_litellm_model"] is None
 
-    def test_model_router_no_model_in_litellm_params(self, mock_router, user_api_key_dict, caplog):
+    def test_model_router_no_model_in_litellm_params(self, mock_handler, user_api_key_dict, caplog):
         """Test model_router handles litellm_params without model."""
-        mock_router.get_model_for_label.return_value = {
+        mock_handler.router.get_model_for_label.return_value = {
             "litellm_params": {"api_base": "https://api.anthropic.com"}
         }
 
@@ -239,16 +238,16 @@ class TestModelRouter:
         }
 
         with caplog.at_level(logging.WARNING):
-            result = model_router(data, user_api_key_dict, router=mock_router)
+            result = model_router(data, user_api_key_dict, mock_handler)
 
         # Should log warning about missing model
         assert "No model found in config for model_name: test_model" in caplog.text
         assert result["metadata"]["ccproxy_litellm_model"] is None
 
-    def test_model_router_no_config_with_reload_success(self, mock_router, user_api_key_dict, caplog):
+    def test_model_router_no_config_with_reload_success(self, mock_handler, user_api_key_dict, caplog):
         """Test model_router handles missing config with successful reload."""
         # First call returns None, second call (after reload) returns config
-        mock_router.get_model_for_label.side_effect = [
+        mock_handler.router.get_model_for_label.side_effect = [
             None,  # First call
             {      # Second call after reload
                 "litellm_params": {"model": "claude-sonnet-4-20250514"}
@@ -261,18 +260,18 @@ class TestModelRouter:
         }
 
         with caplog.at_level(logging.INFO):
-            result = model_router(data, user_api_key_dict, router=mock_router)
+            result = model_router(data, user_api_key_dict, mock_handler)
 
         # Should reload and succeed
-        mock_router.reload_models.assert_called_once()
-        assert mock_router.get_model_for_label.call_count == 2
+        mock_handler.router.reload_models.assert_called_once()
+        assert mock_handler.router.get_model_for_label.call_count == 2
         assert result["model"] == "claude-sonnet-4-20250514"
         assert "Successfully routed after model reload: test_model -> claude-sonnet-4-20250514" in caplog.text
 
-    def test_model_router_no_config_reload_fails(self, mock_router, user_api_key_dict):
+    def test_model_router_no_config_reload_fails(self, mock_handler, user_api_key_dict):
         """Test model_router raises error when reload fails."""
         # Both calls return None
-        mock_router.get_model_for_label.return_value = None
+        mock_handler.router.get_model_for_label.return_value = None
 
         data = {
             "model": "original_model",
@@ -280,15 +279,15 @@ class TestModelRouter:
         }
 
         with pytest.raises(ValueError, match="No model configured for model_name 'test_model'"):
-            model_router(data, user_api_key_dict, router=mock_router)
+            model_router(data, user_api_key_dict, mock_handler)
 
         # Should try reload
-        mock_router.reload_models.assert_called_once()
-        assert mock_router.get_model_for_label.call_count == 2
+        mock_handler.router.reload_models.assert_called_once()
+        assert mock_handler.router.get_model_for_label.call_count == 2
 
 
     @patch("ccproxy.hooks.get_config")
-    def test_model_router_default_passthrough_enabled(self, mock_get_config, mock_router, user_api_key_dict):
+    def test_model_router_default_passthrough_enabled(self, mock_get_config, mock_handler, user_api_key_dict):
         """Test model_router with default_model_passthrough=True uses original model."""
         # Configure passthrough mode
         mock_config = MagicMock()
@@ -303,16 +302,16 @@ class TestModelRouter:
             }
         }
 
-        result = model_router(data, user_api_key_dict, router=mock_router)
+        result = model_router(data, user_api_key_dict, mock_handler)
 
         # Should keep original model and not call router
         assert result["model"] == "original_model"
         assert result["metadata"]["ccproxy_litellm_model"] == "claude-sonnet-4-20250514"
         assert result["metadata"]["ccproxy_model_config"] is None
-        mock_router.get_model_for_label.assert_not_called()
+        mock_handler.router.get_model_for_label.assert_not_called()
 
     @patch("ccproxy.hooks.get_config")
-    def test_model_router_default_passthrough_disabled(self, mock_get_config, mock_router, user_api_key_dict):
+    def test_model_router_default_passthrough_disabled(self, mock_get_config, mock_handler, user_api_key_dict):
         """Test model_router with default_model_passthrough=False uses router."""
         # Configure routing mode
         mock_config = MagicMock()
@@ -320,7 +319,7 @@ class TestModelRouter:
         mock_get_config.return_value = mock_config
 
         # Update mock router to return expected values
-        mock_router.get_model_for_label.return_value = {
+        mock_handler.router.get_model_for_label.return_value = {
             "litellm_params": {"model": "routed_model"}
         }
 
@@ -332,15 +331,15 @@ class TestModelRouter:
             }
         }
 
-        result = model_router(data, user_api_key_dict, router=mock_router)
+        result = model_router(data, user_api_key_dict, mock_handler)
 
         # Should use router for "default" label
-        mock_router.get_model_for_label.assert_called_once_with("default")
+        mock_handler.router.get_model_for_label.assert_called_once_with("default")
         assert result["model"] == "routed_model"
         assert result["metadata"]["ccproxy_litellm_model"] == "routed_model"
 
     @patch("ccproxy.hooks.get_config")
-    def test_model_router_passthrough_no_original_model(self, mock_get_config, mock_router, user_api_key_dict, caplog):
+    def test_model_router_passthrough_no_original_model(self, mock_get_config, mock_handler, user_api_key_dict, caplog):
         """Test model_router passthrough mode when no original model is available."""
         # Configure passthrough mode
         mock_config = MagicMock()
@@ -348,7 +347,7 @@ class TestModelRouter:
         mock_get_config.return_value = mock_config
 
         # Update mock router to return expected values
-        mock_router.get_model_for_label.return_value = {
+        mock_handler.router.get_model_for_label.return_value = {
             "litellm_params": {"model": "routed_model"}
         }
 
@@ -361,11 +360,11 @@ class TestModelRouter:
         }
 
         with caplog.at_level(logging.WARNING):
-            result = model_router(data, user_api_key_dict, router=mock_router)
+            result = model_router(data, user_api_key_dict, mock_handler)
 
         # Should fallback to routing and log warning
         assert "No original model found for passthrough mode" in caplog.text
-        mock_router.get_model_for_label.assert_called_once_with("default")
+        mock_handler.router.get_model_for_label.assert_called_once_with("default")
         assert result["model"] == "routed_model"
 
 
@@ -379,7 +378,7 @@ class TestForwardOAuth:
             "metadata": {"ccproxy_litellm_model": "claude-sonnet-4-20250514"}
         }
 
-        result = forward_oauth(data, user_api_key_dict)
+        result = forward_oauth(data, user_api_key_dict, None)
 
         # Should return unchanged data
         assert result == data
@@ -403,7 +402,7 @@ class TestForwardOAuth:
         }
 
         with caplog.at_level(logging.INFO):
-            result = forward_oauth(data, user_api_key_dict)
+            result = forward_oauth(data, user_api_key_dict, None)
 
         # Should forward OAuth token
         assert "provider_specific_header" in result
@@ -431,7 +430,7 @@ class TestForwardOAuth:
             }
         }
 
-        result = forward_oauth(data, user_api_key_dict)
+        result = forward_oauth(data, user_api_key_dict, None)
 
         # Should forward OAuth token
         assert result["provider_specific_header"]["extra_headers"]["authorization"] == "Bearer sk-ant-oat01-test-token"
@@ -454,7 +453,7 @@ class TestForwardOAuth:
             }
         }
 
-        result = forward_oauth(data, user_api_key_dict)
+        result = forward_oauth(data, user_api_key_dict, None)
 
         # Should forward OAuth token
         assert result["provider_specific_header"]["extra_headers"]["authorization"] == "Bearer sk-ant-oat01-test-token"
@@ -475,7 +474,7 @@ class TestForwardOAuth:
             }
         }
 
-        result = forward_oauth(data, user_api_key_dict)
+        result = forward_oauth(data, user_api_key_dict, None)
 
         # Should forward OAuth token
         assert result["provider_specific_header"]["extra_headers"]["authorization"] == "Bearer sk-ant-oat01-test-token"
@@ -496,7 +495,7 @@ class TestForwardOAuth:
             }
         }
 
-        result = forward_oauth(data, user_api_key_dict)
+        result = forward_oauth(data, user_api_key_dict, None)
 
         # Should forward OAuth token
         assert result["provider_specific_header"]["extra_headers"]["authorization"] == "Bearer sk-ant-oat01-test-token"
@@ -519,7 +518,7 @@ class TestForwardOAuth:
             }
         }
 
-        result = forward_oauth(data, user_api_key_dict)
+        result = forward_oauth(data, user_api_key_dict, None)
 
         # Should not forward OAuth token
         assert "provider_specific_header" not in result
@@ -542,7 +541,7 @@ class TestForwardOAuth:
             }
         }
 
-        result = forward_oauth(data, user_api_key_dict)
+        result = forward_oauth(data, user_api_key_dict, None)
 
         # Should not forward OAuth token
         assert "provider_specific_header" not in result
@@ -568,7 +567,7 @@ class TestForwardOAuth:
             }
         }
 
-        result = forward_oauth(data, user_api_key_dict)
+        result = forward_oauth(data, user_api_key_dict, None)
 
         # Should not forward OAuth token
         assert "provider_specific_header" not in result
@@ -591,7 +590,7 @@ class TestForwardOAuth:
             }
         }
 
-        result = forward_oauth(data, user_api_key_dict)
+        result = forward_oauth(data, user_api_key_dict, None)
 
         # Should not forward OAuth token
         assert "provider_specific_header" not in result
@@ -612,7 +611,7 @@ class TestForwardOAuth:
             # secret_fields is missing
         }
 
-        result = forward_oauth(data, user_api_key_dict)
+        result = forward_oauth(data, user_api_key_dict, None)
 
         # Should not forward OAuth token
         assert "provider_specific_header" not in result
@@ -638,7 +637,7 @@ class TestForwardOAuth:
             }
         }
 
-        result = forward_oauth(data, user_api_key_dict)
+        result = forward_oauth(data, user_api_key_dict, None)
 
         # Should preserve existing headers and add auth
         assert result["provider_specific_header"]["extra_headers"]["existing-header"] == "existing-value"
@@ -663,7 +662,7 @@ class TestForwardOAuth:
             # provider_specific_header is missing
         }
 
-        result = forward_oauth(data, user_api_key_dict)
+        result = forward_oauth(data, user_api_key_dict, None)
 
         # Should create the structure and add auth
         assert "provider_specific_header" in result
@@ -688,7 +687,7 @@ class TestForwardOAuth:
             }
         }
 
-        result = forward_oauth(data, user_api_key_dict)
+        result = forward_oauth(data, user_api_key_dict, None)
 
         # Should not forward OAuth token for invalid URL
         assert "provider_specific_header" not in result
@@ -709,7 +708,7 @@ class TestForwardOAuth:
             }
         }
 
-        result = forward_oauth(data, user_api_key_dict)
+        result = forward_oauth(data, user_api_key_dict, None)
 
         # Should still forward for claude prefix model
         assert result["provider_specific_header"]["extra_headers"]["authorization"] == "Bearer sk-ant-oat01-test-token"
@@ -732,7 +731,7 @@ class TestForwardOAuth:
             }
         }
 
-        result = forward_oauth(data, user_api_key_dict)
+        result = forward_oauth(data, user_api_key_dict, None)
 
         # Should not forward OAuth token without user-agent
         assert "provider_specific_header" not in result
@@ -759,7 +758,7 @@ class TestForwardOAuth:
 
         # Patch urlparse to raise an exception
         with patch('ccproxy.hooks.urlparse', side_effect=Exception("URL parse error")):
-            result = forward_oauth(data, user_api_key_dict)
+            result = forward_oauth(data, user_api_key_dict, None)
 
         # Should not forward OAuth token when URL parsing fails
         assert "provider_specific_header" not in result
@@ -787,7 +786,7 @@ class TestForwardOAuth:
             }
         }
 
-        result = forward_oauth(data, user_api_key_dict)
+        result = forward_oauth(data, user_api_key_dict, None)
 
         # Should not forward OAuth token since none of the Anthropic conditions are met
         # This covers the `else: is_anthropic_provider = False` branch (line 129)
@@ -810,7 +809,7 @@ class TestForwardOAuth:
         }
 
         # Should not crash and should work for anthropic models
-        result = forward_oauth(data, user_api_key_dict)
+        result = forward_oauth(data, user_api_key_dict, None)
 
         # Should forward OAuth for anthropic models even with None config
         assert "provider_specific_header" in result

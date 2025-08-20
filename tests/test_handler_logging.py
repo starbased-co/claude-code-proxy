@@ -65,7 +65,7 @@ class TestHandlerLoggingHookMethods:
             mock_config.debug = False
 
             # Create a mock hook that adds metadata and model
-            def mock_rule_evaluator(data, user_api_key_dict, **kwargs):
+            def mock_rule_evaluator(data, user_api_key_dict, handler, **kwargs):
                 if "metadata" not in data:
                     data["metadata"] = {}
                 data["metadata"]["ccproxy_model_name"] = "default"
@@ -102,7 +102,7 @@ class TestHandlerLoggingHookMethods:
             mock_config = Mock()
             mock_config.debug = True
 
-            def mock_hook(data, user_api_key_dict, **kwargs):
+            def mock_hook(data, user_api_key_dict, handler, **kwargs):
                 return data
             mock_hook.__module__ = "test_module"
             mock_hook.__name__ = "test_hook"
@@ -135,7 +135,7 @@ class TestHandlerLoggingHookMethods:
             mock_config = Mock()
             mock_config.debug = False
 
-            def failing_hook(data, user_api_key_dict, **kwargs):
+            def failing_hook(data, user_api_key_dict, handler, **kwargs):
                 raise ValueError("Hook failed!")
             failing_hook.__name__ = "failing_hook"
 

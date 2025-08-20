@@ -40,7 +40,7 @@ class DefaultRule(ClassificationRule):
         self.passthrough = passthrough
 
     def evaluate(self, request: dict[str, Any], config: "CCProxyConfig") -> bool:
-        """Default rule that always returns true: place at the bottom of the rule list."""
+        """Default rule that always returns true; place at the bottom of the rule list."""
         return True
 
 

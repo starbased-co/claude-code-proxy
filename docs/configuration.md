@@ -258,6 +258,34 @@ ccproxy:
 
 Only the `forward_oauth` is required for Claude Code to function properly.
 
+### Hook Signature
+
+All hooks must follow this signature:
+
+```python
+def hook_name(
+    data: dict[str, Any],
+    user_api_key_dict: dict[str, Any], 
+    handler: Any,
+    **kwargs: Any
+) -> dict[str, Any]:
+    """
+    Args:
+        data: Request data dictionary containing model, messages, metadata, etc.
+        user_api_key_dict: Dictionary containing user API key information
+        handler: CCProxyHandler instance providing access to:
+            - handler.classifier: RequestClassifier for rule evaluation
+            - handler.router: ModelRouter for model routing
+            - handler.hooks: List of configured hooks
+            - handler.config: CCProxyConfig instance
+        **kwargs: Additional keyword arguments for future extensibility
+    
+    Returns:
+        Modified request data dictionary
+    """
+    pass
+```
+
 ### Example: Request Logging Hook
 
 ```python
@@ -267,10 +295,22 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-def request_logger(data: dict[str, Any], user_api_key_dict: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
-    """Log detailed request information."""
+def request_logger(data: dict[str, Any], user_api_key_dict: dict[str, Any], handler: Any, **kwargs: Any) -> dict[str, Any]:
+    """Log detailed request information.
+    
+    Args:
+        data: Request data dictionary
+        user_api_key_dict: User API key information
+        handler: CCProxyHandler instance providing access to classifier, router, and other components
+        **kwargs: Additional keyword arguments for future extensibility
+    """
     metadata = data.get("metadata", {})
     logger.info(f"Processing request for model: {data.get('model')}")
+    
+    # You can access handler components if needed:
+    # classifier = handler.classifier
+    # router = handler.router
+    
     return data
 ```
 
